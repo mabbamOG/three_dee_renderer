@@ -37,7 +37,7 @@ fn main() {
             window.update_with_buffer(&pixels, WIDTH, HEIGHT).unwrap();
             count += 1;
         }
-        if window.is_key_down(Key::Escape) {
+        if window.is_key_down(Key::Escape) || !window.is_open() {
             break;
         }
         window.update();
