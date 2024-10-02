@@ -117,7 +117,6 @@ fn rands() -> [u32;4] {
     [a,b,c,d]
 }
 
-// #[macroquad::main("HELLO")]
 #[macroquad::main(window_conf)]
 async fn main() {
     println!("Hello, world!");
