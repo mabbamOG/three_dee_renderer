@@ -1,3 +1,4 @@
+#![allow(unused)]
 use macroquad::texture::{draw_texture, Texture2D};
 use macroquad::input::{is_key_down, is_key_released, is_mouse_button_down};
 use macroquad::miniquad::{KeyCode, MouseButton};
@@ -203,13 +204,13 @@ fn draw_region(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, yle
     }
 }
 
-// fn draw_region_part(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen: usize, reg: &[u32], reg_width: usize) {
-//     for x in startx..startx+xlen {
-//         for y in starty..starty+ylen {
-//             pixels[index(x,y)] = reg[y*reg_width + x];
-//         }
-//     }
-// }
+fn draw_region_part(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen: usize, reg: &[u32], reg_width: usize) {
+    for x in startx..startx+xlen {
+        for y in starty..starty+ylen {
+            pixels[index(x,y)] = reg[y*reg_width + x];
+        }
+    }
+}
 
 fn dump_region(pixels: &[u32], startx: usize, starty: usize, xlen: usize, ylen: usize) -> Vec<u32> {
     let mut out = vec![0; xlen*ylen];
@@ -296,14 +297,6 @@ fn rands() -> [u32;4] {
 }
 
 fn is_overlapping(x1: usize, y1: usize, w1: usize, h1:usize, x2: usize, y2: usize, w2: usize, h2: usize) -> bool {
-    // let (left1, right1) = (x1, x1 + w1);
-    // let (left2, right2) = (x2, x2+w2);
-    // let (up1, down1) = (y1, y1+h1);
-    // let (up2, down2) = (y2, y2+h2);
-    // let overlappingx = (left2 >= left1 && left2 <= right1) || (right2 >= left1 && right2 <= right1);
-    // let overlappingy = (up2 >= up1 && up2 <= down1) || (down2 >= up1 && down2 <= down1);
-    // overlappingx && overlappingy
-
     // Check if one rectangle is to the left of the other
     if x1 + w1 < x2 {
         return false;
@@ -325,115 +318,207 @@ fn is_overlapping(x1: usize, y1: usize, w1: usize, h1:usize, x2: usize, y2: usiz
     true
 }
 
-// fn get_overlapping(x1: usize, y1: usize, w1: usize, h1:usize, x2: usize, y2: usize, w2: usize, h2: usize) -> (usize, usize, usize, usize) {
-//     let left = x1.max(x2);
-//     let top = y1.max(y2);
-//     let right = x1.min(x2 + w2);
-//     let bottom = y1.min(y2 + h2);
+fn elapsed_secs(elapsed: &instant::Duration) -> usize {
+    const IS_WASM32: bool = cfg!(target_arch = "wasm32");
+    if IS_WASM32 {elapsed.as_millis() as usize} else {elapsed.as_secs() as usize}
+}
 
-//     let width = right - left;
-//     let height = bottom - top;
-//     (left, top, width, height)
-// }
+fn elapsed_millis(elapsed: &instant::Duration) -> usize {
+    const IS_WASM32: bool = cfg!(target_arch = "wasm32");
+    if IS_WASM32 {elapsed.as_micros() as usize} else {elapsed.as_millis() as usize}
+}
+
+#[derive(Clone, Copy)]
+struct Vector2D {
+    x: f32,
+    y: f32
+}
+
+#[derive(Clone, Copy)]
+struct Vector3D {
+    x: f32,
+    y: f32,
+    z: f32
+}
+
+struct Camera {
+    pos: Vector3D, // where is the camera positioned
+    rot: Vector3D, // where is the camera looking at
+    fov: f32 // field of view angle of the camera
+}
+
+fn orthographic_projection(point: Vector3D) -> Vector2D {
+    const FOV_SCALE: f32 = 128.0;
+    const TRANSLATION_WIDTH: f32 = WIDTH as f32 / 2.0;
+    const TRANSLATION_HEIGHT: f32 = HEIGHT as f32 / 2.0;
+    Vector2D { x: FOV_SCALE * point.x + TRANSLATION_WIDTH, y: FOV_SCALE * point.y + TRANSLATION_HEIGHT }
+}
+
+fn draw_vectors(pixels: &mut[u32], points: &[Vector2D], colour: u32) {
+    for i in 0..points.len() {
+        draw_rect(pixels, points[i].x as usize, points[i].y as usize, 3, 3, colour);
+    }
+}
 
 #[macroquad::main(window_conf)]
+#[warn(unused)]
 async fn main() {
-    println!("Hello, world!");
-    let mut pixels = vec![WHITE; WIDTH*HEIGHT];
-    draw_dotgrid(&mut pixels);
-    fill(&mut pixels, WHITE);
-    draw_grid(&mut pixels);
-    draw_rect(&mut pixels, 10, 30, 50, 5, BLACK);
-    draw_rect(&mut pixels, 400, 50, 50, 100, GREY);
-    draw_rect(&mut pixels, WIDTH*50/100, HEIGHT*50/100, 100, 80, LIGHT_GREY);
-    draw_pixel(&mut pixels, 200, 200, BLACK);
-    draw_char(&mut pixels, 30, 30, 10, C, BLACK);
-    draw_char(&mut pixels, 70, 30, 10, A, BLACK);
-    draw_char(&mut pixels, 110, 30, 10, O, BLACK);
-    draw_char(&mut pixels, 150, 30, 10, S, BLACK);
-    draw_text(&mut pixels, 30, 80, 15, 15, &[C,A,O,S], BLACK);
-    draw_text(&mut pixels, 50, 150, 20, 15, &[S,E,X,Y], BLACK);
-    draw_num(&mut pixels, WIDTH*70/100, HEIGHT*70/100, 10, 10, 302, BLACK);
-    draw_text(&mut pixels, WIDTH*5/100, HEIGHT*60/100, 10, 10, &[H,E,L,L,O,SPACE], GREY);
-    draw_heart(&mut pixels, WIDTH*50/100 + 10, HEIGHT*55/100, 80, 50, WHITE);
+    let mut background = vec![WHITE; WIDTH*HEIGHT];
+    draw_dotgrid(&mut background);
+    draw_text(&mut background, WIDTH*70/100, HEIGHT*90/100, 10, 10, &[B,O,B], LIGHT_GREY);
+    let mut cube_points = vec![Vector3D{x: 0.0,y: 0.0,z: 0.0}; 9*9*9];
+    let mut i = 0;
+    for x in 0..9 {
+        for y in 0..9 {
+            for z in 0..9 {
+                cube_points[i].x = -1.0 + x as f32 * 0.25;
+                cube_points[i].y = -1.0 + y as f32 * 0.25;
+                cube_points[i].z = -1.0 + z as f32 * 0.25;
+                i += 1;
+            }
+        }
+    }
+    let mut projected_cube_points = vec![Vector2D{x: 0.0, y: 0.0}; cube_points.len()];
+    for i in 0..cube_points.len() {
+        projected_cube_points[i] = orthographic_projection(cube_points[i]);
+    }
 
-    let (mut reg, mut startx, mut starty, mut xlen, mut ylen) = (vec![], 0,0,0,0);
-    let (mut fps, fps_startxy, fps_thickness) = (0, 5, 10);
-    let (fps_xlen, fps_ylen) = (fps_thickness*CHARWIDTH*3, fps_thickness*CHARWIDTH);
-    let fps_reg = dump_region(&pixels, fps_startxy, fps_startxy, fps_xlen, fps_ylen);
-    let mut time = instant::Instant::now();
-    let bob_xlen = 40;
-    let bob_ylen = 4*bob_xlen;
-    let (mut bob_x, bob_y) = (0, HEIGHT - bob_ylen);
-    let mut bob_reg = dump_region(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen);
-    let mut bob_colour = BLACK;
-    let mut heart_colour = WHITE;
-    let mut last_updated = "BOB";
+    // CUBE
+    draw_vectors(&mut background, &projected_cube_points, BLACK);
+
+    let (mut fps,mut fps_timer, mut fps_counter) = (0, instant::Instant::now(), 0);
+    let (mut bobx, boby, bobwidth, bobheight, mut bob_timer) = (0, HEIGHT - 50, 20, 50, instant::Instant::now());
     loop {
+        let mut pixels = background.clone();
+
         // QUIT
         if is_key_down(KeyCode::Escape) {
             macroquad::window::miniquad::window::quit();
             break;
         } 
 
-        // RANDOM SQUARE
-        if is_key_down(KeyCode::Space) || is_key_released(KeyCode::Enter) || is_mouse_button_down(MouseButton::Left) {
-            if last_updated == "BOB" && is_overlapping(startx, starty, xlen, ylen, bob_x, bob_y, bob_xlen, bob_ylen) {
-                draw_region(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen, &bob_reg);
-            }
-            draw_region(&mut pixels, startx, starty, xlen, ylen, &reg);
-            let rect = rands();
-            let colour = rect[0]^rect[1]^rect[2]^rect[3];
-            startx = rect[0] as usize % WIDTH;
-            starty = rect[1] as usize % HEIGHT;
-            xlen = rect[2] as usize % (WIDTH - startx);
-            ylen = rect[3] as usize % (HEIGHT - starty);
-            reg = dump_region(&pixels, startx, starty, xlen, ylen);
-            draw_rect(&mut pixels, startx, starty, xlen, ylen, colour);
-            last_updated = "RECT";
-        }
-
-        // CHANGE BACKGROUND
-        if is_key_released(KeyCode::Backspace) {
-            fill(&mut pixels, WHITE);
-            draw_dotgrid(&mut pixels);
-            draw_rect(&mut pixels, WIDTH*70/100, HEIGHT*50/100, WIDTH*10/100, HEIGHT*30/100, GREY);
-            // background = pixels.clone();
-            reg = dump_region(&pixels, startx, starty, xlen, ylen);
-        }
-
         // FPS COUNTER
-        fps += 1;
-        const IS_WASM32: bool = cfg!(target_arch = "wasm32");
-        let elapsed = time.elapsed();
-        let elapsed_secs = if IS_WASM32 {elapsed.as_millis() as usize} else {elapsed.as_secs() as usize}; // bugged library...
-        let elapsed_millis = if IS_WASM32 {elapsed.as_micros() as usize} else {elapsed.as_millis() as usize};
-        if elapsed_secs > 0 {
-            fps %= 1000;
-            draw_region(&mut pixels, fps_startxy, fps_startxy, fps_xlen, fps_ylen, &fps_reg);
-            draw_num(&mut pixels, 5, 5, 5, 10, fps, GREY);
-            fps = 0;
-            time += elapsed;
+        fps_counter += 1;
+        let elapsed = fps_timer.elapsed();
+        if elapsed_secs(&elapsed) > 0 {
+            fps = fps_counter;
+            fps_counter = 0;
+            fps_timer += elapsed;
         }
+        draw_num(&mut pixels, 0, 0, 5, 3, fps, LIGHT_GREY);
 
         // BOB
-        if elapsed_millis > 500 {
-            if last_updated == "RECT" && is_overlapping(startx, starty, xlen, ylen, bob_x, bob_y, bob_xlen, bob_ylen) {
-                draw_region(&mut pixels, startx, starty, xlen, ylen, &reg);
-            }
-            draw_region(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen, &bob_reg);
-            bob_x += 5;
-            bob_x %= WIDTH - bob_xlen;
-            bob_reg = dump_region(&pixels, bob_x, bob_y, bob_xlen, bob_ylen);
-            draw_bob(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen, LIGHT_GREY, BLACK);
-            draw_text(&mut pixels, WIDTH*45/100, 20, 30, 20, &[B,O,B], bob_colour);
-            draw_heart(&mut pixels, WIDTH*50/100 + 10, HEIGHT*55/100, 80, 50, heart_colour);
-            heart_colour = if heart_colour==WHITE {RED} else {WHITE};
-            bob_colour = if bob_colour==BLACK {LIGHT_GREY} else {BLACK};
-            last_updated = "BOB";
+        let elapsed = bob_timer.elapsed();
+        if elapsed_millis(&elapsed) > 300 {
+            bobx = (bobx + 5 + bobwidth) % WIDTH;
+            bob_timer += elapsed;
         }
+        draw_bob(&mut pixels, bobx, boby, bobwidth, bobheight, BLACK, WHITE);
 
-
+        
+        
         window_update_with_buffer(&pixels).await;
     }
 }
+
+// #[macroquad::main(window_conf)]
+// async fn main() {
+//     println!("Hello, world!");
+//     let mut pixels = vec![WHITE; WIDTH*HEIGHT];
+//     draw_dotgrid(&mut pixels);
+//     fill(&mut pixels, WHITE);
+//     draw_grid(&mut pixels);
+//     draw_rect(&mut pixels, 10, 30, 50, 5, BLACK);
+//     draw_rect(&mut pixels, 400, 50, 50, 100, GREY);
+//     draw_rect(&mut pixels, WIDTH*50/100, HEIGHT*50/100, 100, 80, LIGHT_GREY);
+//     draw_pixel(&mut pixels, 200, 200, BLACK);
+//     draw_char(&mut pixels, 30, 30, 10, C, BLACK);
+//     draw_char(&mut pixels, 70, 30, 10, A, BLACK);
+//     draw_char(&mut pixels, 110, 30, 10, O, BLACK);
+//     draw_char(&mut pixels, 150, 30, 10, S, BLACK);
+//     draw_text(&mut pixels, 30, 80, 15, 15, &[C,A,O,S], BLACK);
+//     draw_text(&mut pixels, 50, 150, 20, 15, &[S,E,X,Y], BLACK);
+//     draw_num(&mut pixels, WIDTH*70/100, HEIGHT*70/100, 10, 10, 302, BLACK);
+//     draw_text(&mut pixels, WIDTH*5/100, HEIGHT*60/100, 10, 10, &[H,E,L,L,O,SPACE], GREY);
+//     draw_heart(&mut pixels, WIDTH*50/100 + 10, HEIGHT*55/100, 80, 50, WHITE);
+
+//     let (mut reg, mut startx, mut starty, mut xlen, mut ylen) = (vec![], 0,0,0,0);
+//     let (mut fps, fps_startxy, fps_thickness) = (0, 5, 10);
+//     let (fps_xlen, fps_ylen) = (fps_thickness*CHARWIDTH*3, fps_thickness*CHARWIDTH);
+//     let fps_reg = dump_region(&pixels, fps_startxy, fps_startxy, fps_xlen, fps_ylen);
+//     let mut time = instant::Instant::now();
+//     let bob_xlen = 40;
+//     let bob_ylen = 4*bob_xlen;
+//     let (mut bob_x, bob_y) = (0, HEIGHT - bob_ylen);
+//     let mut bob_reg = dump_region(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen);
+//     let mut bob_colour = BLACK;
+//     let mut heart_colour = WHITE;
+//     let mut last_updated = "BOB";
+//     loop {
+//         // QUIT
+//         if is_key_down(KeyCode::Escape) {
+//             macroquad::window::miniquad::window::quit();
+//             break;
+//         } 
+
+//         // RANDOM SQUARE
+//         if is_key_down(KeyCode::Space) || is_key_released(KeyCode::Enter) || is_mouse_button_down(MouseButton::Left) {
+//             if last_updated == "BOB" && is_overlapping(startx, starty, xlen, ylen, bob_x, bob_y, bob_xlen, bob_ylen) {
+//                 draw_region(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen, &bob_reg);
+//             }
+//             draw_region(&mut pixels, startx, starty, xlen, ylen, &reg);
+//             let rect = rands();
+//             let colour = rect[0]^rect[1]^rect[2]^rect[3];
+//             startx = rect[0] as usize % WIDTH;
+//             starty = rect[1] as usize % HEIGHT;
+//             xlen = rect[2] as usize % (WIDTH - startx);
+//             ylen = rect[3] as usize % (HEIGHT - starty);
+//             reg = dump_region(&pixels, startx, starty, xlen, ylen);
+//             draw_rect(&mut pixels, startx, starty, xlen, ylen, colour);
+//             last_updated = "RECT";
+//         }
+
+//         // CHANGE BACKGROUND
+//         if is_key_released(KeyCode::Backspace) {
+//             fill(&mut pixels, WHITE);
+//             draw_dotgrid(&mut pixels);
+//             draw_rect(&mut pixels, WIDTH*70/100, HEIGHT*50/100, WIDTH*10/100, HEIGHT*30/100, GREY);
+//             // background = pixels.clone();
+//             reg = dump_region(&pixels, startx, starty, xlen, ylen);
+//         }
+
+//         // FPS COUNTER
+//         fps += 1;
+//         const IS_WASM32: bool = cfg!(target_arch = "wasm32");
+//         let elapsed = time.elapsed();
+//         let elapsed_secs = if IS_WASM32 {elapsed.as_millis() as usize} else {elapsed.as_secs() as usize}; // bugged library...
+//         let elapsed_millis = if IS_WASM32 {elapsed.as_micros() as usize} else {elapsed.as_millis() as usize};
+//         if elapsed_secs > 0 {
+//             fps %= 1000;
+//             draw_region(&mut pixels, fps_startxy, fps_startxy, fps_xlen, fps_ylen, &fps_reg);
+//             draw_num(&mut pixels, 5, 5, 5, 10, fps, GREY);
+//             fps = 0;
+//             time += elapsed;
+//         }
+
+//         // BOB
+//         if elapsed_millis > 500 {
+//             if last_updated == "RECT" && is_overlapping(startx, starty, xlen, ylen, bob_x, bob_y, bob_xlen, bob_ylen) {
+//                 draw_region(&mut pixels, startx, starty, xlen, ylen, &reg);
+//             }
+//             draw_region(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen, &bob_reg);
+//             bob_x += 5;
+//             bob_x %= WIDTH - bob_xlen;
+//             bob_reg = dump_region(&pixels, bob_x, bob_y, bob_xlen, bob_ylen);
+//             draw_bob(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen, LIGHT_GREY, BLACK);
+//             draw_text(&mut pixels, WIDTH*45/100, 20, 30, 20, &[B,O,B], bob_colour);
+//             draw_heart(&mut pixels, WIDTH*50/100 + 10, HEIGHT*55/100, 80, 50, heart_colour);
+//             heart_colour = if heart_colour==WHITE {RED} else {WHITE};
+//             bob_colour = if bob_colour==BLACK {LIGHT_GREY} else {BLACK};
+//             last_updated = "BOB";
+//         }
+
+
+//         window_update_with_buffer(&pixels).await;
+//     }
+// }
