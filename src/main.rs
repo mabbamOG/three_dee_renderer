@@ -1,12 +1,11 @@
-#![allow(unused)]
+// #![allow(unused)]
 use macroquad::texture::{draw_texture, Texture2D};
-use macroquad::input::{is_key_down, is_key_released, is_mouse_button_down};
+use macroquad::input::{is_key_down, is_key_released, is_mouse_button_down, is_mouse_button_pressed};
 use macroquad::miniquad::{KeyCode, MouseButton};
 use macroquad::prelude::Conf;
-
 const NAME: &str = "PoopyPoop";
-const WIDTH: usize = 600;
-const HEIGHT: usize = 400;
+const WIDTH: usize = 800;
+const HEIGHT: usize = 600;
 const WHITE: u32 = 0xff_ff_ff;
 const BLACK: u32 = 0x00_00_00;
 const GREY: u32 = 0x88_88_88;
@@ -155,24 +154,24 @@ fn index(x: usize, y: usize) -> usize {
     y*WIDTH + x
 }
 
-fn fill(pixels: &mut[u32], colour: u32) {
-    for i in 0..WIDTH*HEIGHT {
-        pixels[i] = colour;
-    }
-}
+// fn fill(pixels: &mut[u32], colour: u32) {
+//     for i in 0..WIDTH*HEIGHT {
+//         pixels[i] = colour;
+//     }
+// }
 
-fn draw_grid(pixels: &mut[u32]) {
-    for x in (0..WIDTH).step_by(10) {
-        for y in 0..HEIGHT {
-            pixels[index(x,y)] = BLACK;
-        }
-    }
-    for x in 0..WIDTH {
-        for y in (0..HEIGHT).step_by(10) {
-            pixels[index(x,y)] = BLACK;
-        }
-    }
-}
+// fn draw_grid(pixels: &mut[u32]) {
+//     for x in (0..WIDTH).step_by(10) {
+//         for y in 0..HEIGHT {
+//             pixels[index(x,y)] = BLACK;
+//         }
+//     }
+//     for x in 0..WIDTH {
+//         for y in (0..HEIGHT).step_by(10) {
+//             pixels[index(x,y)] = BLACK;
+//         }
+//     }
+// }
 
 fn draw_dotgrid(pixels: &mut[u32]) {
     for x in (0..WIDTH).step_by(10) {
@@ -190,39 +189,39 @@ fn draw_rect(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen:
     }
 }
 
-fn draw_pixel(pixels: &mut[u32], x: usize, y: usize, colour: u32) {
-    pixels[index(x,y)] = colour;
-}
+// fn draw_pixel(pixels: &mut[u32], x: usize, y: usize, colour: u32) {
+//     pixels[index(x,y)] = colour;
+// }
 
-fn draw_region(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen: usize, reg: &[u32]) {
-    let mut i = 0;
-    for x in startx..startx+xlen {
-        for y in starty..starty+ylen {
-            pixels[index(x,y)] = reg[i];
-            i += 1;
-        }
-    }
-}
+// fn _draw_region(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen: usize, reg: &[u32]) {
+//     let mut i = 0;
+//     for x in startx..startx+xlen {
+//         for y in starty..starty+ylen {
+//             pixels[index(x,y)] = reg[i];
+//             i += 1;
+//         }
+//     }
+// }
 
-fn draw_region_part(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen: usize, reg: &[u32], reg_width: usize) {
-    for x in startx..startx+xlen {
-        for y in starty..starty+ylen {
-            pixels[index(x,y)] = reg[y*reg_width + x];
-        }
-    }
-}
+// fn draw_region_part(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen: usize, reg: &[u32], reg_width: usize) {
+//     for x in startx..startx+xlen {
+//         for y in starty..starty+ylen {
+//             pixels[index(x,y)] = reg[y*reg_width + x];
+//         }
+//     }
+// }
 
-fn dump_region(pixels: &[u32], startx: usize, starty: usize, xlen: usize, ylen: usize) -> Vec<u32> {
-    let mut out = vec![0; xlen*ylen];
-    let mut i = 0;
-    for x in startx..startx+xlen {
-        for y in starty..starty+ylen {
-            out[i] = pixels[index(x,y)];
-            i += 1;
-        }
-    }
-    out
-}
+// fn dump_region(pixels: &[u32], startx: usize, starty: usize, xlen: usize, ylen: usize) -> Vec<u32> {
+//     let mut out = vec![0; xlen*ylen];
+//     let mut i = 0;
+//     for x in startx..startx+xlen {
+//         for y in starty..starty+ylen {
+//             out[i] = pixels[index(x,y)];
+//             i += 1;
+//         }
+//     }
+//     out
+// }
 
 fn draw_char(pixels: &mut[u32], startx: usize, starty: usize, thickness: usize, c: &[bool], colour: u32) {
     let mut i = 0;
@@ -296,27 +295,27 @@ fn rands() -> [u32;4] {
     [a,b,c,d]
 }
 
-fn is_overlapping(x1: usize, y1: usize, w1: usize, h1:usize, x2: usize, y2: usize, w2: usize, h2: usize) -> bool {
-    // Check if one rectangle is to the left of the other
-    if x1 + w1 < x2 {
-        return false;
-    }
-    // Check if one rectangle is to the right of the other
-    if x2 + w2 < x1 {
-        return false;
-    }
-    // Check if one rectangle is above the other
-    if y1 + h1 < y2 {
-        return false;
-    }
-    // Check if one rectangle is below the other
-    if y2 + h2 < y1 {
-        return false;
-    }
+// fn is_overlapping(x1: usize, y1: usize, w1: usize, h1:usize, x2: usize, y2: usize, w2: usize, h2: usize) -> bool {
+//     // Check if one rectangle is to the left of the other
+//     if x1 + w1 < x2 {
+//         return false;
+//     }
+//     // Check if one rectangle is to the right of the other
+//     if x2 + w2 < x1 {
+//         return false;
+//     }
+//     // Check if one rectangle is above the other
+//     if y1 + h1 < y2 {
+//         return false;
+//     }
+//     // Check if one rectangle is below the other
+//     if y2 + h2 < y1 {
+//         return false;
+//     }
     
-    // If none of the above are true, the rectangles must overlap
-    true
-}
+//     // If none of the above are true, the rectangles must overlap
+//     true
+// }
 
 fn elapsed_secs(elapsed: &instant::Duration) -> usize {
     const IS_WASM32: bool = cfg!(target_arch = "wasm32");
@@ -347,16 +346,70 @@ struct Camera {
     fov: f32 // field of view angle of the camera
 }
 
-fn orthographic_projection(point: Vector3D) -> Vector2D {
-    const FOV_SCALE: f32 = 128.0;
-    const TRANSLATION_WIDTH: f32 = WIDTH as f32 / 2.0;
-    const TRANSLATION_HEIGHT: f32 = HEIGHT as f32 / 2.0;
-    Vector2D { x: FOV_SCALE * point.x + TRANSLATION_WIDTH, y: FOV_SCALE * point.y + TRANSLATION_HEIGHT }
+fn project_orthographic(points3d: &[Vector3D], fov_scale: f32, translation_width: f32, translation_height: f32) -> Vec<Vector2D> {
+    let mut points2d = vec![Vector2D{x: 0.0, y: 0.0}; points3d.len()];
+    for i in 0..points3d.len() {
+        points2d[i].x = points3d[i].x * fov_scale + translation_width;
+        points2d[i].y = points3d[i].y * fov_scale + translation_height;
+    }
+    points2d
 }
 
-fn draw_vectors(pixels: &mut[u32], points: &[Vector2D], colour: u32) {
+fn draw_projection(pixels: &mut[u32], points: &[Vector2D], colour: u32) {
     for i in 0..points.len() {
         draw_rect(pixels, points[i].x as usize, points[i].y as usize, 3, 3, colour);
+    }
+}
+
+fn project_isometric(points3d: &[Vector3D], fov_scale: f32, translation_width: f32, translation_height: f32) -> Vec<Vector2D> {
+    let mut points2d = vec![Vector2D{x: 0.0, y: 0.0}; points3d.len()];
+    for i in 0..points3d.len() {
+        points2d[i].x = (points3d[i].x - points3d[i].z) * fov_scale + translation_width;
+        points2d[i].y = (points3d[i].x / 2.0 + points3d[i].y + points3d[i].z / 2.0) * fov_scale + translation_height;
+    }
+    points2d
+}
+
+fn project_perspective(points3d: &[Vector3D], fov_scale: f32, translation_width: f32, translation_height: f32, translation_depth: f32) -> Vec<Vector2D> {
+    let mut points2d = vec![Vector2D{x: 0.0, y: 0.0}; points3d.len()];
+    for i in 0..points3d.len() {
+        points2d[i].x = (points3d[i].x / (points3d[i].z + translation_depth)) * fov_scale + translation_width; // scaledown assuming fov-z is 1.0
+        points2d[i].y = (points3d[i].y / (points3d[i].z + translation_depth)) * fov_scale + translation_height; // scaledown assuming fov-z is 1.0
+    }
+    points2d
+}
+
+fn scale3d(points: &mut[Vector3D], fov_scale: f32) {
+    for i in 0..points.len() {
+        points[i].x *= fov_scale;
+        points[i].y *= fov_scale;
+        points[i].z *= fov_scale;
+    }
+}
+
+fn translate3d(points: &mut[Vector3D], translation_width: f32, translation_height: f32, translation_depth: f32) {
+    for i in 0..points.len() {
+        points[i].x += translation_width;
+        points[i].y += translation_height;
+        points[i].z += translation_depth;
+    }
+}
+
+
+fn rotate3d(points: &mut[Vector3D], xangle: f32, yangle: f32, zangle: f32) {
+    fn rotate2d(x: f32, y: f32, angle: f32) -> (f32, f32) {
+        let (sina, cosa) = (angle.sin(), angle.cos());
+        (x*cosa - y*sina, x*sina + y*cosa)
+    }
+
+    for i in 0..points.len() {
+        let (mut x, mut y, mut z) = (points[i].x, points[i].y, points[i].z);
+        (y,z) = rotate2d(y, z, xangle);
+        (x,z) = rotate2d(x, z, yangle);
+        (x,y) = rotate2d(x, y, zangle);
+        points[i].x = x;
+        points[i].y = y;
+        points[i].z = z;
     }
 }
 
@@ -366,28 +419,28 @@ async fn main() {
     let mut background = vec![WHITE; WIDTH*HEIGHT];
     draw_dotgrid(&mut background);
     draw_text(&mut background, WIDTH*70/100, HEIGHT*90/100, 10, 10, &[B,O,B], LIGHT_GREY);
-    let mut cube_points = vec![Vector3D{x: 0.0,y: 0.0,z: 0.0}; 9*9*9];
+
+    // CUBE
+    let mut cube = vec![Vector3D{x: 0.0,y: 0.0,z: 0.0}; 9*9*9];
     let mut i = 0;
     for x in 0..9 {
         for y in 0..9 {
             for z in 0..9 {
-                cube_points[i].x = -1.0 + x as f32 * 0.25;
-                cube_points[i].y = -1.0 + y as f32 * 0.25;
-                cube_points[i].z = -1.0 + z as f32 * 0.25;
+                cube[i].x = -1.0 + x as f32 * 0.25;
+                cube[i].y = -1.0 + y as f32 * 0.25;
+                cube[i].z = -1.0 + z as f32 * 0.25;
                 i += 1;
             }
         }
     }
-    let mut projected_cube_points = vec![Vector2D{x: 0.0, y: 0.0}; cube_points.len()];
-    for i in 0..cube_points.len() {
-        projected_cube_points[i] = orthographic_projection(cube_points[i]);
-    }
-
-    // CUBE
-    draw_vectors(&mut background, &projected_cube_points, BLACK);
+    // let cube_points_orthographic = project_orthographic(&cube_points, 128.0, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0);
+    // let cube_points_perspective = project_perspective(&cube_points, (WIDTH+HEIGHT) as f32 / 2.0, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0, -5.0);
+    // let cube_points_isometric = project_isometric(&cube_points, 50.0, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0);
 
     let (mut fps,mut fps_timer, mut fps_counter) = (0, instant::Instant::now(), 0);
     let (mut bobx, boby, bobwidth, bobheight, mut bob_timer) = (0, HEIGHT - 50, 20, 50, instant::Instant::now());
+    let (mut heartx, hearty, heartwidth, heartheight, mut heartcolour) = (WIDTH*20/100, HEIGHT - 50, 50, 50, RED); 
+    let mut cube_timer = instant::Instant::now();
     loop {
         let mut pixels = background.clone();
 
@@ -396,6 +449,11 @@ async fn main() {
             macroquad::window::miniquad::window::quit();
             break;
         } 
+
+        // MOUSE
+        if is_mouse_button_down(MouseButton::Left) {
+            heartcolour = rands().into_iter().fold(0, |x, y| x ^ y);
+        }
 
         // FPS COUNTER
         fps_counter += 1;
@@ -409,11 +467,32 @@ async fn main() {
 
         // BOB
         let elapsed = bob_timer.elapsed();
-        if elapsed_millis(&elapsed) > 300 {
-            bobx = (bobx + 5 + bobwidth) % WIDTH;
+        if elapsed_millis(&elapsed) > 100 {
+            bobx += bobwidth;
+            if bobx + bobwidth > WIDTH {
+                bobx = 0;
+            }
             bob_timer += elapsed;
         }
         draw_bob(&mut pixels, bobx, boby, bobwidth, bobheight, BLACK, WHITE);
+
+        // HEART
+        if heartx >= bobx && heartx < bobx + bobwidth {
+            heartx += 20;
+            if heartx + heartwidth > WIDTH {
+                heartx = WIDTH*30/100;
+            }
+        }
+        draw_heart(&mut pixels, heartx, hearty, heartwidth, heartheight, heartcolour);
+
+        // CUBE
+        let elapsed = cube_timer.elapsed();
+        if elapsed_millis(&elapsed) > 10 {
+            rotate3d(&mut cube, 0.01, 0.01, 0.01);
+            cube_timer += elapsed;
+        }
+        let cube_perspective = project_perspective(&cube, (WIDTH+HEIGHT) as f32 / 2.0, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0, -5.0);
+        draw_projection(&mut pixels, &cube_perspective, BLACK);
 
         
         
