@@ -1,6 +1,6 @@
 // #![allow(unused)]
 use macroquad::texture::{draw_texture, Texture2D};
-use macroquad::input::{is_key_down, is_key_released, is_mouse_button_down, is_mouse_button_pressed};
+use macroquad::input::{is_key_down, is_mouse_button_down};
 use macroquad::miniquad::{KeyCode, MouseButton};
 use macroquad::prelude::Conf;
 const NAME: &str = "PoopyPoop";
@@ -8,11 +8,11 @@ const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
 const WHITE: u32 = 0xff_ff_ff;
 const BLACK: u32 = 0x00_00_00;
-const GREY: u32 = 0x88_88_88;
+const _GREY: u32 = 0x88_88_88;
 const RED: u32 = 0xff_00_00;
 const LIGHT_GREY: u32 = 0xcc_cc_cc;
 const CHARWIDTH: usize = 3;
-const A: &[bool] = &trans([
+const _A: &[bool] = &trans([
     true, true, true,
     true, true, true,
     true, false, true
@@ -22,22 +22,22 @@ const B: &[bool] = &trans([
     true, true, true,
     true, true, true
 ]);
-const C: &[bool] = &trans([
+const _C: &[bool] = &trans([
     true, true, true,
     true, false, false,
     true, true, true
 ]);
-const E: &[bool] = &trans([
+const _E: &[bool] = &trans([
     true, true, true,
     true, true, false,
     true, true, true
 ]);
-const H: &[bool] = &trans([
+const _H: &[bool] = &trans([
     true, false, true,
     true, true, true,
     true, false, true
 ]);
-const L: &[bool] = &trans([
+const _L: &[bool] = &trans([
     true, false, false,
     true, false, false,
     true, true, true
@@ -47,22 +47,22 @@ const O: &[bool] = &trans([
     true, false, true,
     true, true, true
 ]);
-const S: &[bool] = &trans([
+const _S: &[bool] = &trans([
     false, true, true,
     false, true, false,
     true, true, false
 ]);
-const X: &[bool] = &trans([
+const _X: &[bool] = &trans([
     true, false, true,
     false, true, false,
     true, false, true
 ]);
-const Y: &[bool] = &trans([
+const _Y: &[bool] = &trans([
     true, false, true,
     false, true, false,
     false, true, false
 ]);
-const SPACE: &[bool] = &trans([
+const _SPACE: &[bool] = &trans([
     false, false, false,
     false, false, false,
     false, false, false
@@ -340,13 +340,13 @@ struct Vector3D {
     z: f32
 }
 
-struct Camera {
+struct _Camera {
     pos: Vector3D, // where is the camera positioned
     rot: Vector3D, // where is the camera looking at
     fov: f32 // field of view angle of the camera
 }
 
-fn project_orthographic(points3d: &[Vector3D], fov_scale: f32, translation_width: f32, translation_height: f32) -> Vec<Vector2D> {
+fn _project_orthographic(points3d: &[Vector3D], fov_scale: f32, translation_width: f32, translation_height: f32) -> Vec<Vector2D> {
     let mut points2d = vec![Vector2D{x: 0.0, y: 0.0}; points3d.len()];
     for i in 0..points3d.len() {
         points2d[i].x = points3d[i].x * fov_scale + translation_width;
@@ -361,7 +361,7 @@ fn draw_projection(pixels: &mut[u32], points: &[Vector2D], colour: u32) {
     }
 }
 
-fn project_isometric(points3d: &[Vector3D], fov_scale: f32, translation_width: f32, translation_height: f32) -> Vec<Vector2D> {
+fn _project_isometric(points3d: &[Vector3D], fov_scale: f32, translation_width: f32, translation_height: f32) -> Vec<Vector2D> {
     let mut points2d = vec![Vector2D{x: 0.0, y: 0.0}; points3d.len()];
     for i in 0..points3d.len() {
         points2d[i].x = (points3d[i].x - points3d[i].z) * fov_scale + translation_width;
@@ -370,47 +370,30 @@ fn project_isometric(points3d: &[Vector3D], fov_scale: f32, translation_width: f
     points2d
 }
 
-fn project_perspective(points3d: &[Vector3D], fov_scale: f32, translation_width: f32, translation_height: f32, translation_depth: f32) -> Vec<Vector2D> {
-    let mut points2d = vec![Vector2D{x: 0.0, y: 0.0}; points3d.len()];
-    for i in 0..points3d.len() {
-        points2d[i].x = (points3d[i].x / (points3d[i].z + translation_depth)) * fov_scale + translation_width; // scaledown assuming fov-z is 1.0
-        points2d[i].y = (points3d[i].y / (points3d[i].z + translation_depth)) * fov_scale + translation_height; // scaledown assuming fov-z is 1.0
-    }
-    points2d
+fn rotate2d(x: f32, y: f32, angle: f32) -> (f32, f32) {
+    let (sina, cosa) = (angle.sin(), angle.cos());
+    (x*cosa - y*sina, x*sina + y*cosa)
 }
 
-fn scale3d(points: &mut[Vector3D], fov_scale: f32) {
-    for i in 0..points.len() {
-        points[i].x *= fov_scale;
-        points[i].y *= fov_scale;
-        points[i].z *= fov_scale;
-    }
+fn rotate3d(mut x: f32, mut y:f32, mut z: f32, xangle: f32, yangle: f32, zangle: f32) -> (f32, f32, f32) {
+    (y,z) = rotate2d(y, z, xangle);
+    (x,z) = rotate2d(x, z, yangle);
+    (x,y) = rotate2d(x, y, zangle);
+    (x, y, z)
 }
 
-fn translate3d(points: &mut[Vector3D], translation_width: f32, translation_height: f32, translation_depth: f32) {
+fn project_perspective(points: &[Vector3D], fov_scale: f32, translation_width: f32, translation_height: f32, translation_depth: f32, xrotation: f32, yrotation: f32, zrotation: f32) -> Vec<Vector2D> {
+    let mut projection = vec![Vector2D{x: 0.0, y: 0.0}; points.len()];
     for i in 0..points.len() {
-        points[i].x += translation_width;
-        points[i].y += translation_height;
-        points[i].z += translation_depth;
+        let (x, y, z) = rotate3d(points[i].x, points[i].y, points[i].z, xrotation, yrotation, zrotation);
+        projection[i].x = (x / (z + translation_depth)) * fov_scale + translation_width; // scaledown assuming fov-z is 1.0
+        projection[i].y = (y / (z + translation_depth)) * fov_scale + translation_height; // scaledown assuming fov-z is 1.0
     }
+    projection
 }
 
-
-fn rotate3d(points: &mut[Vector3D], xangle: f32, yangle: f32, zangle: f32) {
-    fn rotate2d(x: f32, y: f32, angle: f32) -> (f32, f32) {
-        let (sina, cosa) = (angle.sin(), angle.cos());
-        (x*cosa - y*sina, x*sina + y*cosa)
-    }
-
-    for i in 0..points.len() {
-        let (mut x, mut y, mut z) = (points[i].x, points[i].y, points[i].z);
-        (y,z) = rotate2d(y, z, xangle);
-        (x,z) = rotate2d(x, z, yangle);
-        (x,y) = rotate2d(x, y, zangle);
-        points[i].x = x;
-        points[i].y = y;
-        points[i].z = z;
-    }
+fn oscillate(x: f32, max: f32) -> f32 {
+    (( x % (max*2.0) - max).abs() - max).abs()
 }
 
 #[macroquad::main(window_conf)]
@@ -433,14 +416,11 @@ async fn main() {
             }
         }
     }
-    // let cube_points_orthographic = project_orthographic(&cube_points, 128.0, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0);
-    // let cube_points_perspective = project_perspective(&cube_points, (WIDTH+HEIGHT) as f32 / 2.0, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0, -5.0);
-    // let cube_points_isometric = project_isometric(&cube_points, 50.0, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0);
 
     let (mut fps,mut fps_timer, mut fps_counter) = (0, instant::Instant::now(), 0);
     let (mut bobx, boby, bobwidth, bobheight, mut bob_timer) = (0, HEIGHT - 50, 20, 50, instant::Instant::now());
     let (mut heartx, hearty, heartwidth, heartheight, mut heartcolour) = (WIDTH*20/100, HEIGHT - 50, 50, 50, RED); 
-    let mut cube_timer = instant::Instant::now();
+    let (mut cube_timer, mut cube_rot, mut cube_scale_i, mut cube_scale) = (instant::Instant::now(), 0.0, 0.0, 0.0);
     loop {
         let mut pixels = background.clone();
 
@@ -487,15 +467,15 @@ async fn main() {
 
         // CUBE
         let elapsed = cube_timer.elapsed();
-        if elapsed_millis(&elapsed) > 10 {
-            rotate3d(&mut cube, 0.01, 0.01, 0.01);
+        if elapsed_millis(&elapsed) > 1 {
             cube_timer += elapsed;
+            cube_rot += 0.01;
+            cube_scale_i += 1.0;
+            cube_scale = oscillate(cube_scale_i, (WIDTH+HEIGHT) as f32 / 3.0);
         }
-        let cube_perspective = project_perspective(&cube, (WIDTH+HEIGHT) as f32 / 2.0, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0, -5.0);
-        draw_projection(&mut pixels, &cube_perspective, BLACK);
+        let projection = project_perspective(&cube,  cube_scale, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0, -5.0, cube_rot, cube_rot, cube_rot);
+        draw_projection(&mut pixels, &projection, BLACK);
 
-        
-        
         window_update_with_buffer(&pixels).await;
     }
 }
