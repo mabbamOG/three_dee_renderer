@@ -3,6 +3,8 @@ use macroquad::texture::{draw_texture, Texture2D};
 use macroquad::input::{is_key_down, is_mouse_button_down};
 use macroquad::miniquad::{KeyCode, MouseButton};
 use macroquad::prelude::Conf;
+use macroquad::{color, window};
+use instant::{Duration, Instant};
 const NAME: &str = "PoopyPoop";
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
@@ -189,9 +191,10 @@ fn draw_rect(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen:
     }
 }
 
-// fn draw_pixel(pixels: &mut[u32], x: usize, y: usize, colour: u32) {
-//     pixels[index(x,y)] = colour;
-// }
+#[inline]
+fn draw_pixel(pixels: &mut[u32], x: usize, y: usize, colour: u32) {
+    pixels[index(x,y)] = colour;
+}
 
 // fn _draw_region(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen: usize, reg: &[u32]) {
 //     let mut i = 0;
@@ -276,8 +279,8 @@ async fn window_update_with_buffer(pixels: &[u32]) {
         [red, green, blue, 255]
     }).collect::<Vec<u8>>();
     let texture = Texture2D::from_rgba8(WIDTH as u16, HEIGHT as u16, &bytes);
-    draw_texture(&texture, 0.0, 0.0, macroquad::color::WHITE); // IMPORTANT: KEEP THIS TO WHITE!!!
-    macroquad::window::next_frame().await
+    draw_texture(&texture, 0.0, 0.0, color::WHITE); // IMPORTANT: KEEP THIS TO WHITE!!!
+    window::next_frame().await
 }
 
 static mut SEED: [u32;4] = [1,3,3,7];
@@ -317,12 +320,12 @@ fn rands() -> [u32;4] {
 //     true
 // }
 
-fn elapsed_secs(elapsed: &instant::Duration) -> usize {
+fn elapsed_secs(elapsed: &Duration) -> usize {
     const IS_WASM32: bool = cfg!(target_arch = "wasm32");
     if IS_WASM32 {elapsed.as_millis() as usize} else {elapsed.as_secs() as usize}
 }
 
-fn elapsed_millis(elapsed: &instant::Duration) -> usize {
+fn elapsed_millis(elapsed: &Duration) -> usize {
     const IS_WASM32: bool = cfg!(target_arch = "wasm32");
     if IS_WASM32 {elapsed.as_micros() as usize} else {elapsed.as_millis() as usize}
 }
@@ -355,7 +358,7 @@ fn _project_orthographic(points3d: &[Vector3D], fov_scale: f32, translation_widt
     points2d
 }
 
-fn draw_projection(pixels: &mut[u32], points: &[Vector2D], colour: u32) {
+fn _draw_projection(pixels: &mut[u32], points: &[Vector2D], colour: u32) {
     for i in 0..points.len() {
         draw_rect(pixels, points[i].x as usize, points[i].y as usize, 3, 3, colour);
     }
@@ -396,14 +399,7 @@ fn oscillate(x: f32, max: f32) -> f32 {
     (( x % (max*2.0) - max).abs() - max).abs()
 }
 
-#[macroquad::main(window_conf)]
-#[warn(unused)]
-async fn main() {
-    let mut background = vec![WHITE; WIDTH*HEIGHT];
-    draw_dotgrid(&mut background);
-    draw_text(&mut background, WIDTH*70/100, HEIGHT*90/100, 10, 10, &[B,O,B], LIGHT_GREY);
-
-    // CUBE
+fn _model_cube_dotted() -> Vec<Vector3D> {
     let mut cube = vec![Vector3D{x: 0.0,y: 0.0,z: 0.0}; 9*9*9];
     let mut i = 0;
     for x in 0..9 {
@@ -416,17 +412,102 @@ async fn main() {
             }
         }
     }
+    cube
+}
 
-    let (mut fps,mut fps_timer, mut fps_counter) = (0, instant::Instant::now(), 0);
-    let (mut bobx, boby, bobwidth, bobheight, mut bob_timer) = (0, HEIGHT - 50, 20, 50, instant::Instant::now());
+fn model_cube_mesh() -> (Vec<Vector3D>, Vec<Triangle>) {
+    let mut cube = vec![Vector3D{x: 0.0, y: 0.0, z: 0.0}; 8];
+    let mut i = 0;
+    for x in 0..2 {
+        for y in 0..2 {
+            for z in 0..2 {
+                cube[i].x = -1.0 + x as f32 * 2.0;
+                cube[i].y = -1.0 + y as f32 * 2.0;
+                cube[i].z = -1.0 + z as f32 * 2.0;
+                println!("{i} -> {} {} {}", cube[i].x, cube[i].y, cube[i].z);
+                i += 1;
+            }
+        }
+    }
+    // WARNING: the triangles have not been adjusted for rotation order!
+    let faces = vec![
+        // LEFT RIGHT
+        Triangle{a: 0, b: 1, c: 3},
+        Triangle{a: 0, b: 2, c: 3},
+        Triangle{a: 4, b: 5, c: 7},
+        Triangle{a: 4, b: 6, c: 7},
+
+        // TOP BOTTOM
+        Triangle{a: 0, b: 1, c: 5},
+        Triangle{a: 0, b: 4, c: 5},
+        Triangle{a: 2, b: 3, c: 7},
+        Triangle{a: 2, b: 6, c: 7},
+
+        // FRONT BACK
+        Triangle{a: 0, b: 2, c: 4},
+        Triangle{a: 2, b: 4, c: 6},
+        Triangle{a: 1, b: 3, c: 5},
+        Triangle{a: 3, b: 5, c: 7},
+    ];
+    (cube, faces)
+}
+
+#[derive(Clone, Copy)]
+struct Triangle { // structure that encodes triangle face indexes in a mesh
+    a: usize,
+    b: usize,
+    c: usize
+}
+
+fn draw_line(pixels: &mut[u32], mut x1: f32, mut y1: f32, x2: f32, y2: f32, colour: u32) {
+    let xdelta = x2 - x1;
+    let ydelta = y2 - y1;
+    let walk = if xdelta.abs() >= ydelta.abs() { xdelta.abs() } else {ydelta.abs()};
+    let xincrement = xdelta / walk;
+    let yincrement = ydelta / walk;
+    for _ in 0..walk as usize {
+        draw_pixel(pixels, x1.round() as usize, y1.round() as usize, colour);
+        x1 += xincrement;
+        y1 += yincrement;
+    }
+}
+
+fn draw_projection_with_mesh(pixels: &mut[u32], points: &[Vector2D], triangles: &[Triangle], colour: u32) {
+    for i in 0..points.len() {
+        draw_rect(pixels, points[i].x as usize, points[i].y as usize, 3, 3, colour);
+    }
+
+    for i in 0..triangles.len() {
+        let point1 = points[triangles[i].a];
+        let point2 = points[triangles[i].b];
+        let point3 = points[triangles[i].c];
+        draw_line(pixels, point1.x, point1.y, point2.x, point2.y, colour);
+        draw_line(pixels, point2.x, point2.y, point3.x, point3.y, colour);
+        draw_line(pixels, point3.x, point3.y, point1.x, point1.y, colour);
+    }
+}
+
+#[macroquad::main(window_conf)]
+#[warn(unused)]
+async fn main() {
+    let mut background = vec![WHITE; WIDTH*HEIGHT];
+    draw_dotgrid(&mut background);
+    draw_text(&mut background, WIDTH*70/100, HEIGHT*90/100, 10, 10, &[B,O,B], LIGHT_GREY);
+
+    // CUBE mesh
+    let (cube, triangles) = model_cube_mesh();
+
+    let (mut fps,mut fps_timer, mut fps_counter) = (0, Instant::now(), 0);
+    let (mut bobx, boby, bobwidth, bobheight, mut bob_timer) = (0, HEIGHT - 50, 20, 50, Instant::now());
     let (mut heartx, hearty, heartwidth, heartheight, mut heartcolour) = (WIDTH*20/100, HEIGHT - 50, 50, 50, RED); 
-    let (mut cube_timer, mut cube_rot, mut cube_scale_i, mut cube_scale) = (instant::Instant::now(), 0.0, 0.0, 0.0);
+    let (mut cube_timer, mut cube_rot, mut cube_scale_i, mut cube_scale) = (Instant::now(), 0.0, 0.0, 0.0);
+    // let mut global_timer = Instant::now();
     loop {
         let mut pixels = background.clone();
 
         // QUIT
         if is_key_down(KeyCode::Escape) {
-            macroquad::window::miniquad::window::quit();
+            window::miniquad::window::quit();
             break;
         } 
 
@@ -467,14 +548,22 @@ async fn main() {
 
         // CUBE
         let elapsed = cube_timer.elapsed();
-        if elapsed_millis(&elapsed) > 1 {
+        if elapsed_millis(&elapsed) > 1000 / 30 * 0{
             cube_timer += elapsed;
             cube_rot += 0.01;
             cube_scale_i += 1.0;
             cube_scale = oscillate(cube_scale_i, (WIDTH+HEIGHT) as f32 / 3.0);
         }
-        let projection = project_perspective(&cube,  cube_scale, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0, -5.0, cube_rot, cube_rot, cube_rot);
-        draw_projection(&mut pixels, &projection, BLACK);
+        let projection = project_perspective(&cube,  cube_scale + 0.0 * (WIDTH+HEIGHT) as f32 / 2.0, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0, -5.0, cube_rot, cube_rot, cube_rot);
+        draw_projection_with_mesh(&mut pixels, &projection, &triangles, BLACK);
+
+        // GLOBAL FPS LOCK WITH SLEEP -----> DOES NOT WORK OVER WASM!
+        // let elapsed = global_timer.elapsed();
+        // if elapsed < Duration::from_millis(1000/10) {
+        //     std::thread::sleep(Duration::from_millis(1000/10) - elapsed);
+        // }
+        // global_timer += elapsed;
+
 
         window_update_with_buffer(&pixels).await;
     }
