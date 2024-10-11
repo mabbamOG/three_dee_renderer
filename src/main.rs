@@ -192,8 +192,15 @@ fn draw_rect(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen:
 }
 
 #[inline]
-fn draw_pixel(pixels: &mut[u32], x: usize, y: usize, colour: u32) {
+fn _draw_pixel(pixels: &mut[u32], x: usize, y: usize, colour: u32) {
     pixels[index(x,y)] = colour;
+}
+
+#[inline]
+fn draw_pixel_restricted(pixels: &mut[u32], x: usize, y: usize, colour: u32) {
+    if x < WIDTH && y < HEIGHT {
+        pixels[index(x,y)] = colour;
+    }
 }
 
 // fn _draw_region(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen: usize, reg: &[u32]) {
@@ -395,7 +402,7 @@ fn project_perspective(points: &[Vector3D], fov_scale: f32, translation_width: f
     projection
 }
 
-fn oscillate(x: f32, max: f32) -> f32 {
+fn _oscillate(x: f32, max: f32) -> f32 {
     (( x % (max*2.0) - max).abs() - max).abs()
 }
 
@@ -415,7 +422,7 @@ fn _model_cube_dotted() -> Vec<Vector3D> {
     cube
 }
 
-fn model_cube_mesh() -> (Vec<Vector3D>, Vec<Triangle>) {
+fn _model_cube_mesh() -> (Vec<Vector3D>, Vec<Face>) {
     let mut cube = vec![Vector3D{x: 0.0, y: 0.0, z: 0.0}; 8];
     let mut i = 0;
     for x in 0..2 {
@@ -432,59 +439,77 @@ fn model_cube_mesh() -> (Vec<Vector3D>, Vec<Triangle>) {
     // WARNING: the triangles have not been adjusted for rotation order!
     let faces = vec![
         // LEFT RIGHT
-        Triangle{a: 0, b: 1, c: 3},
-        Triangle{a: 0, b: 2, c: 3},
-        Triangle{a: 4, b: 5, c: 7},
-        Triangle{a: 4, b: 6, c: 7},
+        Face{a: 0, b: 1, c: 3},
+        Face{a: 0, b: 2, c: 3},
+        Face{a: 4, b: 5, c: 7},
+        Face{a: 4, b: 6, c: 7},
 
         // TOP BOTTOM
-        Triangle{a: 0, b: 1, c: 5},
-        Triangle{a: 0, b: 4, c: 5},
-        Triangle{a: 2, b: 3, c: 7},
-        Triangle{a: 2, b: 6, c: 7},
+        Face{a: 0, b: 1, c: 5},
+        Face{a: 0, b: 4, c: 5},
+        Face{a: 2, b: 3, c: 7},
+        Face{a: 2, b: 6, c: 7},
 
         // FRONT BACK
-        Triangle{a: 0, b: 2, c: 4},
-        Triangle{a: 2, b: 4, c: 6},
-        Triangle{a: 1, b: 3, c: 5},
-        Triangle{a: 3, b: 5, c: 7},
+        Face{a: 0, b: 2, c: 4},
+        Face{a: 2, b: 4, c: 6},
+        Face{a: 1, b: 3, c: 5},
+        Face{a: 3, b: 5, c: 7},
     ];
     (cube, faces)
 }
 
 #[derive(Clone, Copy)]
-struct Triangle { // structure that encodes triangle face indexes in a mesh
+struct Face { // structure that encodes triangle face indexes in a mesh
     a: usize,
     b: usize,
     c: usize
 }
 
-fn draw_line(pixels: &mut[u32], mut x1: f32, mut y1: f32, x2: f32, y2: f32, colour: u32) {
+fn draw_line_restricted(pixels: &mut[u32], mut x1: f32, mut y1: f32, x2: f32, y2: f32, colour: u32) {
     let xdelta = x2 - x1;
     let ydelta = y2 - y1;
     let walk = if xdelta.abs() >= ydelta.abs() { xdelta.abs() } else {ydelta.abs()};
     let xincrement = xdelta / walk;
     let yincrement = ydelta / walk;
     for _ in 0..walk as usize {
-        draw_pixel(pixels, x1.round() as usize, y1.round() as usize, colour);
+        draw_pixel_restricted(pixels, x1.round() as usize, y1.round() as usize, colour);
         x1 += xincrement;
         y1 += yincrement;
     }
 }
 
-fn draw_projection_with_mesh(pixels: &mut[u32], points: &[Vector2D], triangles: &[Triangle], colour: u32) {
-    for i in 0..points.len() {
-        draw_rect(pixels, points[i].x as usize, points[i].y as usize, 3, 3, colour);
+fn draw_projection_with_mesh(pixels: &mut[u32], points: &[Vector2D], faces: &[Face], colour: u32) {
+    for i in 0..faces.len() {
+        let point1 = points[faces[i].a];
+        let point2 = points[faces[i].b];
+        let point3 = points[faces[i].c];
+        draw_line_restricted(pixels, point1.x, point1.y, point2.x, point2.y, colour);
+        draw_line_restricted(pixels, point2.x, point2.y, point3.x, point3.y, colour);
+        draw_line_restricted(pixels, point3.x, point3.y, point1.x, point1.y, colour);
     }
+}
 
-    for i in 0..triangles.len() {
-        let point1 = points[triangles[i].a];
-        let point2 = points[triangles[i].b];
-        let point3 = points[triangles[i].c];
-        draw_line(pixels, point1.x, point1.y, point2.x, point2.y, colour);
-        draw_line(pixels, point2.x, point2.y, point3.x, point3.y, colour);
-        draw_line(pixels, point3.x, point3.y, point1.x, point1.y, colour);
+async fn load_mesh_obj(name: &str) -> (Vec<Vector3D>, Vec<Face>) {
+    let filename = format!("./assets/{name}.obj");
+    let mut points: Vec<Vector3D> = vec![];
+    let mut faces: Vec<Face> = vec![];
+    // let file_string = std::fs::read_to_string(filename).unwrap(); // INCOMPATIBLE WITH WEB
+    let file_string = macroquad::file::load_string(&filename).await.unwrap();
+    for line in file_string.lines() {
+        if line.starts_with("v ") {
+            let fields = line.split_ascii_whitespace();
+            let [x, y, z] = fields.skip(1).map(|s| s.parse::<f32>().unwrap()).collect::<Vec<f32>>().try_into().unwrap();
+            let point = Vector3D{x, y, z};
+            points.push(point);
+        } else if line.starts_with("f ") {
+            let fields = line.split_ascii_whitespace();
+            let [a, b, c] = fields.skip(1).map(|s| s.split('/').next().unwrap().parse::<usize>().unwrap() - 1).take(3).collect::<Vec<usize>>().try_into().unwrap();
+            let face = Face{a, b, c};
+            faces.push(face);
+        }
     }
+    (points, faces)
 }
 
 #[macroquad::main(window_conf)]
@@ -495,15 +520,18 @@ async fn main() {
     draw_text(&mut background, WIDTH*70/100, HEIGHT*90/100, 10, 10, &[B,O,B], LIGHT_GREY);
 
     // CUBE mesh
-    let (cube, triangles) = model_cube_mesh();
+    let (mesh, triangles) = load_mesh_obj("bunny").await;
 
     let (mut fps,mut fps_timer, mut fps_counter) = (0, Instant::now(), 0);
     let (mut bobx, boby, bobwidth, bobheight, mut bob_timer) = (0, HEIGHT - 50, 20, 50, Instant::now());
     let (mut heartx, hearty, heartwidth, heartheight, mut heartcolour) = (WIDTH*20/100, HEIGHT - 50, 50, 50, RED); 
-    let (mut cube_timer, mut cube_rot, mut cube_scale_i, mut cube_scale) = (Instant::now(), 0.0, 0.0, 0.0);
+    // let (mut mesh_timer, mut mesh_rot, mut mesh_scale_i, mut mesh_scale) = (Instant::now(), 0.0, 0.0, 0.0);
+    let (mut mesh_scale, mut mesh_xangle, mut mesh_yangle, mut mesh_zangle, mut mesh_startx, mut mesh_starty) = (1000.0, 0.0, 0.0, 0.0, WIDTH as f32 / 2.0 + 15.0, HEIGHT as f32 / 2.0);
+    let mut i = 0.0;
     // let mut global_timer = Instant::now();
     loop {
         let mut pixels = background.clone();
+        let randcolour = rands().into_iter().fold(0, |x, y| x ^ y);
 
         // QUIT
         if is_key_down(KeyCode::Escape) {
@@ -515,6 +543,19 @@ async fn main() {
         if is_mouse_button_down(MouseButton::Left) {
             heartcolour = rands().into_iter().fold(0, |x, y| x ^ y);
         }
+
+        // BUNNIES
+        mesh_yangle += 0.02;
+        i += 1.0;
+        mesh_scale = _oscillate(i, 1500.0);
+        let n = 1<<4;
+        for xi in 0..n {
+            for yi in 0..n {
+                let projection = project_perspective(&mesh,  mesh_scale, mesh_startx - 50.0/2.0*n as f32 + 50.0*xi as f32, mesh_starty -50.0/2.0*n as f32 + 50.0*yi as f32, -5.0, mesh_xangle, mesh_yangle, mesh_zangle);
+                draw_projection_with_mesh(&mut pixels, &projection, &triangles, randcolour);
+            } 
+        }
+        draw_num(&mut pixels, WIDTH*50/100 , HEIGHT*50/100, 10, 5, n * n, BLACK);
 
         // FPS COUNTER
         fps_counter += 1;
@@ -547,15 +588,34 @@ async fn main() {
         draw_heart(&mut pixels, heartx, hearty, heartwidth, heartheight, heartcolour);
 
         // CUBE
-        let elapsed = cube_timer.elapsed();
-        if elapsed_millis(&elapsed) > 1000 / 30 * 0{
-            cube_timer += elapsed;
-            cube_rot += 0.01;
-            cube_scale_i += 1.0;
-            cube_scale = oscillate(cube_scale_i, (WIDTH+HEIGHT) as f32 / 3.0);
+        // let elapsed = mesh_timer.elapsed();
+        // if elapsed_millis(&elapsed) > 1000 / 30 * 0{
+        //     mesh_timer += elapsed;
+        //     mesh_rot += 0.01;
+        //     mesh_scale_i += 1.0;
+        //     mesh_scale = oscillate(mesh_scale_i, (WIDTH+HEIGHT) as f32 / 3.0);
+        // }
+        match [is_key_down(KeyCode::LeftAlt)||is_key_down(KeyCode::RightAlt), is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift), is_key_down(KeyCode::Left), is_key_down(KeyCode::Right), is_key_down(KeyCode::Up), is_key_down(KeyCode::Down)] {
+            _left @ [false, false, true, _, _, _] => { mesh_yangle -= 0.02 },
+            _shift_left @ [false, true, true, _, _, _] => { mesh_startx -= 10.0 },
+            _ctrl_left @ [true, false, true, _, _, _] => { mesh_zangle -= 0.02 },
+
+            _right @ [false, false, _, true, _, _] => { mesh_yangle += 0.02 },
+            _shift_right @ [false, true, _, true, _, _] => { mesh_startx += 10.0 },
+            _ctrl_right @ [true, false, _, true, _, _] => { mesh_zangle += 0.02 },
+
+            _up @ [false, false, _, _, true, _] => { mesh_scale *= 1.1 },
+            _shift_up @ [false, true, _, _, true, _] => { mesh_starty -= 10.0 },
+            _ctrl_up @ [true, false, _, _, true, _] => { mesh_xangle += 0.02 },
+
+            _down @ [false, false, _, _, _, true] => { mesh_scale /= 1.1 },
+            _shift_down @ [false, true, _, _, _, true] => { mesh_starty += 10.0 },
+            _ctrl_down @ [true, false, _, _, _, true] => { mesh_xangle -= 0.02 },
+            _ => {}
         }
-        let projection = project_perspective(&cube,  cube_scale + 0.0 * (WIDTH+HEIGHT) as f32 / 2.0, WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0, -5.0, cube_rot, cube_rot, cube_rot);
+        let projection = project_perspective(&mesh,  mesh_scale * 10.0, mesh_startx, mesh_starty + HEIGHT as f32 / 2.0, -5.0, mesh_xangle, mesh_yangle, mesh_zangle);
         draw_projection_with_mesh(&mut pixels, &projection, &triangles, BLACK);
+
 
         // GLOBAL FPS LOCK WITH SLEEP -----> DOES NOT WORK OVER WASM!
         // let elapsed = global_timer.elapsed();
@@ -568,105 +628,3 @@ async fn main() {
         window_update_with_buffer(&pixels).await;
     }
 }
-
-// #[macroquad::main(window_conf)]
-// async fn main() {
-//     println!("Hello, world!");
-//     let mut pixels = vec![WHITE; WIDTH*HEIGHT];
-//     draw_dotgrid(&mut pixels);
-//     fill(&mut pixels, WHITE);
-//     draw_grid(&mut pixels);
-//     draw_rect(&mut pixels, 10, 30, 50, 5, BLACK);
-//     draw_rect(&mut pixels, 400, 50, 50, 100, GREY);
-//     draw_rect(&mut pixels, WIDTH*50/100, HEIGHT*50/100, 100, 80, LIGHT_GREY);
-//     draw_pixel(&mut pixels, 200, 200, BLACK);
-//     draw_char(&mut pixels, 30, 30, 10, C, BLACK);
-//     draw_char(&mut pixels, 70, 30, 10, A, BLACK);
-//     draw_char(&mut pixels, 110, 30, 10, O, BLACK);
-//     draw_char(&mut pixels, 150, 30, 10, S, BLACK);
-//     draw_text(&mut pixels, 30, 80, 15, 15, &[C,A,O,S], BLACK);
-//     draw_text(&mut pixels, 50, 150, 20, 15, &[S,E,X,Y], BLACK);
-//     draw_num(&mut pixels, WIDTH*70/100, HEIGHT*70/100, 10, 10, 302, BLACK);
-//     draw_text(&mut pixels, WIDTH*5/100, HEIGHT*60/100, 10, 10, &[H,E,L,L,O,SPACE], GREY);
-//     draw_heart(&mut pixels, WIDTH*50/100 + 10, HEIGHT*55/100, 80, 50, WHITE);
-
-//     let (mut reg, mut startx, mut starty, mut xlen, mut ylen) = (vec![], 0,0,0,0);
-//     let (mut fps, fps_startxy, fps_thickness) = (0, 5, 10);
-//     let (fps_xlen, fps_ylen) = (fps_thickness*CHARWIDTH*3, fps_thickness*CHARWIDTH);
-//     let fps_reg = dump_region(&pixels, fps_startxy, fps_startxy, fps_xlen, fps_ylen);
-//     let mut time = instant::Instant::now();
-//     let bob_xlen = 40;
-//     let bob_ylen = 4*bob_xlen;
-//     let (mut bob_x, bob_y) = (0, HEIGHT - bob_ylen);
-//     let mut bob_reg = dump_region(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen);
-//     let mut bob_colour = BLACK;
-//     let mut heart_colour = WHITE;
-//     let mut last_updated = "BOB";
-//     loop {
-//         // QUIT
-//         if is_key_down(KeyCode::Escape) {
-//             macroquad::window::miniquad::window::quit();
-//             break;
-//         } 
-
-//         // RANDOM SQUARE
-//         if is_key_down(KeyCode::Space) || is_key_released(KeyCode::Enter) || is_mouse_button_down(MouseButton::Left) {
-//             if last_updated == "BOB" && is_overlapping(startx, starty, xlen, ylen, bob_x, bob_y, bob_xlen, bob_ylen) {
-//                 draw_region(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen, &bob_reg);
-//             }
-//             draw_region(&mut pixels, startx, starty, xlen, ylen, &reg);
-//             let rect = rands();
-//             let colour = rect[0]^rect[1]^rect[2]^rect[3];
-//             startx = rect[0] as usize % WIDTH;
-//             starty = rect[1] as usize % HEIGHT;
-//             xlen = rect[2] as usize % (WIDTH - startx);
-//             ylen = rect[3] as usize % (HEIGHT - starty);
-//             reg = dump_region(&pixels, startx, starty, xlen, ylen);
-//             draw_rect(&mut pixels, startx, starty, xlen, ylen, colour);
-//             last_updated = "RECT";
-//         }
-
-//         // CHANGE BACKGROUND
-//         if is_key_released(KeyCode::Backspace) {
-//             fill(&mut pixels, WHITE);
-//             draw_dotgrid(&mut pixels);
-//             draw_rect(&mut pixels, WIDTH*70/100, HEIGHT*50/100, WIDTH*10/100, HEIGHT*30/100, GREY);
-//             // background = pixels.clone();
-//             reg = dump_region(&pixels, startx, starty, xlen, ylen);
-//         }
-
-//         // FPS COUNTER
-//         fps += 1;
-//         const IS_WASM32: bool = cfg!(target_arch = "wasm32");
-//         let elapsed = time.elapsed();
-//         let elapsed_secs = if IS_WASM32 {elapsed.as_millis() as usize} else {elapsed.as_secs() as usize}; // bugged library...
-//         let elapsed_millis = if IS_WASM32 {elapsed.as_micros() as usize} else {elapsed.as_millis() as usize};
-//         if elapsed_secs > 0 {
-//             fps %= 1000;
-//             draw_region(&mut pixels, fps_startxy, fps_startxy, fps_xlen, fps_ylen, &fps_reg);
-//             draw_num(&mut pixels, 5, 5, 5, 10, fps, GREY);
-//             fps = 0;
-//             time += elapsed;
-//         }
-
-//         // BOB
-//         if elapsed_millis > 500 {
-//             if last_updated == "RECT" && is_overlapping(startx, starty, xlen, ylen, bob_x, bob_y, bob_xlen, bob_ylen) {
-//                 draw_region(&mut pixels, startx, starty, xlen, ylen, &reg);
-//             }
-//             draw_region(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen, &bob_reg);
-//             bob_x += 5;
-//             bob_x %= WIDTH - bob_xlen;
-//             bob_reg = dump_region(&pixels, bob_x, bob_y, bob_xlen, bob_ylen);
-//             draw_bob(&mut pixels, bob_x, bob_y, bob_xlen, bob_ylen, LIGHT_GREY, BLACK);
-//             draw_text(&mut pixels, WIDTH*45/100, 20, 30, 20, &[B,O,B], bob_colour);
-//             draw_heart(&mut pixels, WIDTH*50/100 + 10, HEIGHT*55/100, 80, 50, heart_colour);
-//             heart_colour = if heart_colour==WHITE {RED} else {WHITE};
-//             bob_colour = if bob_colour==BLACK {LIGHT_GREY} else {BLACK};
-//             last_updated = "BOB";
-//         }
-
-
-//         window_update_with_buffer(&pixels).await;
-//     }
-// }

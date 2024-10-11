@@ -5,3 +5,4 @@ target/wasm32-unknown-unknown/*
 !target/wasm32-unknown-unknown/release
 target/wasm32-unknown-unknown/release/*
 !target/wasm32-unknown-unknown/release/three_dee_renderer.wasm
+.DS_Store
