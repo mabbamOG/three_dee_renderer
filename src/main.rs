@@ -5,6 +5,7 @@ use macroquad::miniquad::{KeyCode, MouseButton};
 use macroquad::prelude::Conf;
 use macroquad::{color, window};
 use instant::{Duration, Instant};
+use std::ops::Sub;
 const NAME: &str = "PoopyPoop";
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
@@ -183,22 +184,21 @@ fn draw_dotgrid(pixels: &mut[u32]) {
     }
 }
 
-fn draw_rect(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen: usize, colour: u32) {
+fn draw_rect<const CHECKED: bool>(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen: usize, colour: u32) {
     for x in startx..startx+xlen {
         for y in starty..starty+ylen {
-            pixels[index(x,y)] = colour;
+            draw_pixel::<CHECKED>(pixels, x, y, colour);
         }
     }
 }
 
 #[inline]
-fn _draw_pixel(pixels: &mut[u32], x: usize, y: usize, colour: u32) {
-    pixels[index(x,y)] = colour;
-}
-
-#[inline]
-fn draw_pixel_restricted(pixels: &mut[u32], x: usize, y: usize, colour: u32) {
-    if x < WIDTH && y < HEIGHT {
+fn draw_pixel<const CHECKED: bool>(pixels: &mut[u32], x: usize, y: usize, colour: u32) {
+    if CHECKED {
+        if x < WIDTH && y < HEIGHT {
+            pixels[index(x,y)] = colour;
+        }
+    } else {
         pixels[index(x,y)] = colour;
     }
 }
@@ -238,7 +238,7 @@ fn draw_char(pixels: &mut[u32], startx: usize, starty: usize, thickness: usize, 
     for x in (startx..startx+3*thickness).step_by(thickness) {
         for y in (starty..starty+3*thickness).step_by(thickness) {
             if c[i] {
-                draw_rect(pixels, x, y, thickness, thickness, colour);
+                draw_rect::<false>(pixels, x, y, thickness, thickness, colour);
             }
             i += 1;
         }
@@ -263,21 +263,21 @@ fn draw_num(pixels: &mut[u32], startx: usize, starty: usize, thickness: usize, s
 }
 
 fn draw_bob(pixels: &mut[u32], startx: usize, starty: usize, xlen: usize, ylen: usize, colour_body: u32, colour_detail: u32) {
-    draw_rect(pixels, startx, starty, xlen, ylen, colour_body); // body
-    draw_rect(pixels, startx + xlen*0/100, starty + ylen*18/100, xlen*40/100, ylen*10/100, colour_detail); // left eye
-    draw_rect(pixels, startx + xlen*80/100, starty + ylen*20/100, xlen*20/100, ylen*5/100, colour_detail); // right eye
-    draw_rect(pixels, startx, starty + ylen*50/100, xlen, ylen*5/100, colour_detail); // mouth
+    draw_rect::<false>(pixels, startx, starty, xlen, ylen, colour_body); // body
+    draw_rect::<false>(pixels, startx + xlen*0/100, starty + ylen*18/100, xlen*40/100, ylen*10/100, colour_detail); // left eye
+    draw_rect::<false>(pixels, startx + xlen*80/100, starty + ylen*20/100, xlen*20/100, ylen*5/100, colour_detail); // right eye
+    draw_rect::<false>(pixels, startx, starty + ylen*50/100, xlen, ylen*5/100, colour_detail); // mouth
 
 }
 
 fn draw_heart(pixels: &mut[u32], startx: usize, starty: usize, width: usize, height: usize, colour: u32) {
-    draw_rect(pixels, startx + width*1/7, starty + height*1/8, width*5/7, height*5/8, colour); // body
-    draw_rect(pixels, startx + width*6/70 , starty + height*2/8, width*5/70, height*2/8, colour); // left flap
-    draw_rect(pixels, startx + width*6/7, starty + height*2/8, width*5/70, height*2/8, colour); // right flap
-    draw_rect(pixels, startx + width*2/7, starty + height*5/80, width*1/7, height*5/80, colour); // left top
-    draw_rect(pixels, startx + width*4/7, starty + height*5/80, width*1/7, height*5/80, colour); // right top
-    draw_rect(pixels, startx + width*2/7, starty + height*6/8, width*3/7, height*1/8, colour); // bottom flap
-    draw_rect(pixels, startx + width*3/7, starty + height*7/8, width*1/7, height*1/8, colour); // bottom
+    draw_rect::<false>(pixels, startx + width*1/7, starty + height*1/8, width*5/7, height*5/8, colour); // body
+    draw_rect::<false>(pixels, startx + width*6/70 , starty + height*2/8, width*5/70, height*2/8, colour); // left flap
+    draw_rect::<false>(pixels, startx + width*6/7, starty + height*2/8, width*5/70, height*2/8, colour); // right flap
+    draw_rect::<false>(pixels, startx + width*2/7, starty + height*5/80, width*1/7, height*5/80, colour); // left top
+    draw_rect::<false>(pixels, startx + width*4/7, starty + height*5/80, width*1/7, height*5/80, colour); // right top
+    draw_rect::<false>(pixels, startx + width*2/7, starty + height*6/8, width*3/7, height*1/8, colour); // bottom flap
+    draw_rect::<false>(pixels, startx + width*3/7, starty + height*7/8, width*1/7, height*1/8, colour); // bottom
 }
 
 async fn window_update_with_buffer(pixels: &[u32]) {
@@ -367,7 +367,7 @@ fn _project_orthographic(points3d: &[Vector3D], fov_scale: f32, translation_widt
 
 fn _draw_projection(pixels: &mut[u32], points: &[Vector2D], colour: u32) {
     for i in 0..points.len() {
-        draw_rect(pixels, points[i].x as usize, points[i].y as usize, 3, 3, colour);
+        draw_rect::<false>(pixels, points[i].x as usize, points[i].y as usize, 3, 3, colour);
     }
 }
 
@@ -395,9 +395,9 @@ fn rotate3d(mut x: f32, mut y:f32, mut z: f32, xangle: f32, yangle: f32, zangle:
 fn project_perspective(points: &[Vector3D], fov_scale: f32, translation_width: f32, translation_height: f32, translation_depth: f32, xrotation: f32, yrotation: f32, zrotation: f32) -> Vec<Vector2D> {
     let mut projection = vec![Vector2D{x: 0.0, y: 0.0}; points.len()];
     for i in 0..points.len() {
-        let (x, y, z) = rotate3d(points[i].x, points[i].y, points[i].z, xrotation, yrotation, zrotation);
-        projection[i].x = (x / (z + translation_depth)) * fov_scale + translation_width; // scaledown assuming fov-z is 1.0
-        projection[i].y = (y / (z + translation_depth)) * fov_scale + translation_height; // scaledown assuming fov-z is 1.0
+        let (x, y, z) = rotate3d(points[i].x, points[i].y, points[i].z, xrotation, yrotation, zrotation); // rotation
+        projection[i].x = (x / (z + translation_depth)) * fov_scale + translation_width; // projection x
+        projection[i].y = (y / (z + translation_depth)) * fov_scale + translation_height; // projection y
     }
     projection
 }
@@ -466,14 +466,14 @@ struct Face { // structure that encodes triangle face indexes in a mesh
     c: usize
 }
 
-fn draw_line_restricted(pixels: &mut[u32], mut x1: f32, mut y1: f32, x2: f32, y2: f32, colour: u32) {
+fn draw_line<const CHECKED: bool>(pixels: &mut[u32], mut x1: f32, mut y1: f32, x2: f32, y2: f32, colour: u32) {
     let xdelta = x2 - x1;
     let ydelta = y2 - y1;
     let walk = if xdelta.abs() >= ydelta.abs() { xdelta.abs() } else {ydelta.abs()};
     let xincrement = xdelta / walk;
     let yincrement = ydelta / walk;
     for _ in 0..walk as usize {
-        draw_pixel_restricted(pixels, x1.round() as usize, y1.round() as usize, colour);
+        draw_pixel::<CHECKED>(pixels, x1.round() as usize, y1.round() as usize, colour);
         x1 += xincrement;
         y1 += yincrement;
     }
@@ -484,9 +484,9 @@ fn draw_projection_with_mesh(pixels: &mut[u32], points: &[Vector2D], faces: &[Fa
         let point1 = points[faces[i].a];
         let point2 = points[faces[i].b];
         let point3 = points[faces[i].c];
-        draw_line_restricted(pixels, point1.x, point1.y, point2.x, point2.y, colour);
-        draw_line_restricted(pixels, point2.x, point2.y, point3.x, point3.y, colour);
-        draw_line_restricted(pixels, point3.x, point3.y, point1.x, point1.y, colour);
+        draw_line::<true>(pixels, point1.x, point1.y, point2.x, point2.y, colour);
+        draw_line::<true>(pixels, point2.x, point2.y, point3.x, point3.y, colour);
+        draw_line::<true>(pixels, point3.x, point3.y, point1.x, point1.y, colour);
     }
 }
 
@@ -512,23 +512,117 @@ async fn load_mesh_obj(name: &str) -> (Vec<Vector3D>, Vec<Face>) {
     (points, faces)
 }
 
+impl Vector2D {
+    #[inline]
+    fn len(self) -> f32 {
+        (self.x*self.x + self.y*self.y).sqrt()
+    }
+
+    fn scale(self, scalar: f32) -> Self {
+        Self{x: self.x*scalar, y: self.y*scalar}
+    }
+
+    fn dot(self, other: Self) -> f32 {
+        self.x*other.x + self.y*other.y
+    }
+
+    fn normalise(self) -> Self {
+        let len = self.len();
+        Self{x: self.x/len, y: self.y/len}
+    }
+}
+impl Sub for Vector2D {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self{x: self.x-rhs.x, y: self.y-rhs.y}
+    }
+}
+
+impl Vector3D {
+    #[inline]
+    fn len(self) -> f32 {
+        (self.x*self.x + self.y*self.y + self.z*self.z).sqrt()
+    }
+
+    fn scale(self, scalar: f32) -> Self {
+        Self{x: self.x*scalar, y: self.y*scalar, z: self.z*scalar}
+    }
+
+    fn cross(self, other: Self) -> Self {
+        Self{x: self.y*other.z-self.z*other.y, y: self.z*other.x-self.x*other.z, z: self.x*other.y-self.y*other.x}
+    }
+
+    fn dot(self, other: Self) -> f32 {
+        self.x*other.x + self.y*other.y + self.z*other.z
+    }
+
+    fn normalise(self) -> Self {
+        let len = self.len();
+        Self{x: self.x/len, y: self.y/len, z: self.z/len}
+    }
+}
+impl Sub for Vector3D {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self{x: self.x-rhs.x, y: self.y-rhs.y, z: self.z-rhs.z}
+    }
+}
+
+fn project_perspective_with_culling(points: &[Vector3D], fov_scale: f32, translation_width: f32, translation_height: f32, translation_depth: f32, camera: Vector3D, xangle: f32, yangle: f32, zangle: f32, faces: &[Face]) -> (Vec<Vector2D>,Vec<Face>) {
+    let mut trans_points = points.to_vec();
+    for i in 0..trans_points.len() {
+        let (x, y, mut z) = rotate3d(trans_points[i].x, trans_points[i].y, trans_points[i].z, xangle, yangle, zangle); // rotate object
+        z += translation_depth; // push object away
+        trans_points[i].x = x;
+        trans_points[i].y = y;
+        trans_points[i].z = z;
+    }
+
+    let mut cull_faces = vec![];
+    let mut projection = vec![Vector2D{x: 0.0, y: 0.0}; trans_points.len()];
+    for i in 0..faces.len() {
+        let (pointa, pointb, pointc) = (trans_points[faces[i].a], trans_points[faces[i].b], trans_points[faces[i].c]);
+        let perpendicular_out = (pointb-pointa).normalise().cross((pointc-pointa).normalise()).normalise(); // ORDERING: LEFT-HANDED SYSTEM
+        let camera_ray = camera - pointa;
+        let alignment = camera_ray.dot(perpendicular_out);
+        if alignment > 0.0 { // if  the face is visible
+            cull_faces.push(faces[i]);
+            projection[faces[i].a].x = (pointa.x / pointa.z) * fov_scale + translation_width; // EITHER OPERATE ON ALL POINTS LATER
+            projection[faces[i].a].y = (pointa.y / pointa.z) * fov_scale + translation_height; // OR OPERATE ON DUPLICATE POINTS NOW
+            projection[faces[i].b].x = (pointb.x / pointb.z) * fov_scale + translation_width;
+            projection[faces[i].b].y = (pointb.y / pointb.z) * fov_scale + translation_height;
+            projection[faces[i].c].x = (pointc.x / pointc.z) * fov_scale + translation_width;
+            projection[faces[i].c].y = (pointc.y / pointc.z) * fov_scale + translation_height;
+        }
+    }
+
+    // for i in 0..trans_points.len() {
+    //     projection[i].x = (trans_points[i].x / trans_points[i].z) * fov_scale + translation_width;
+    //     projection[i].y = (trans_points[i].y / trans_points[i].z) * fov_scale + translation_height;
+    // }
+
+    (projection, cull_faces)
+}
+
 #[macroquad::main(window_conf)]
 #[warn(unused)]
 async fn main() {
+    macroquad::input::show_mouse(false);
     let mut background = vec![WHITE; WIDTH*HEIGHT];
     draw_dotgrid(&mut background);
     draw_text(&mut background, WIDTH*70/100, HEIGHT*90/100, 10, 10, &[B,O,B], LIGHT_GREY);
 
     // CUBE mesh
-    let (mesh, triangles) = load_mesh_obj("bunny").await;
+    let (mesh, faces) = load_mesh_obj("f22").await;
 
     let (mut fps,mut fps_timer, mut fps_counter) = (0, Instant::now(), 0);
     let (mut bobx, boby, bobwidth, bobheight, mut bob_timer) = (0, HEIGHT - 50, 20, 50, Instant::now());
     let (mut heartx, hearty, heartwidth, heartheight, mut heartcolour) = (WIDTH*20/100, HEIGHT - 50, 50, 50, RED); 
     // let (mut mesh_timer, mut mesh_rot, mut mesh_scale_i, mut mesh_scale) = (Instant::now(), 0.0, 0.0, 0.0);
-    let (mut mesh_scale, mut mesh_xangle, mut mesh_yangle, mut mesh_zangle, mut mesh_startx, mut mesh_starty) = (1000.0, 0.0, 0.0, 0.0, WIDTH as f32 / 2.0 + 15.0, HEIGHT as f32 / 2.0);
+    let (mut mesh_scale, mut mesh_xangle, mut mesh_yangle, mut mesh_zangle, mut mesh_startx, mut mesh_starty) = (10.0, 0.0, 0.0, 0.0, WIDTH as f32 / 2.0 + 15.0, HEIGHT as f32 / 2.0);
     let mut i = 0.0;
     // let mut global_timer = Instant::now();
+    let camera = Vector3D { x: 0.0, y: 0.0, z: 0.0 };
     loop {
         let mut pixels = background.clone();
         let randcolour = rands().into_iter().fold(0, |x, y| x ^ y);
@@ -540,22 +634,25 @@ async fn main() {
         } 
 
         // MOUSE
+        let (mousex, mousey) = macroquad::input::mouse_position();
         if is_mouse_button_down(MouseButton::Left) {
             heartcolour = rands().into_iter().fold(0, |x, y| x ^ y);
+            draw_rect::<true>(&mut background, mousex as usize, mousey as usize, 5, 5, BLACK);
         }
+        draw_rect::<true>(&mut pixels, mousex as usize, mousey as usize, 5, 5, RED);
 
         // BUNNIES
-        mesh_yangle += 0.02;
-        i += 1.0;
-        mesh_scale = _oscillate(i, 1500.0);
-        let n = 1<<4;
-        for xi in 0..n {
-            for yi in 0..n {
-                let projection = project_perspective(&mesh,  mesh_scale, mesh_startx - 50.0/2.0*n as f32 + 50.0*xi as f32, mesh_starty -50.0/2.0*n as f32 + 50.0*yi as f32, -5.0, mesh_xangle, mesh_yangle, mesh_zangle);
-                draw_projection_with_mesh(&mut pixels, &projection, &triangles, randcolour);
-            } 
-        }
-        draw_num(&mut pixels, WIDTH*50/100 , HEIGHT*50/100, 10, 5, n * n, BLACK);
+        // mesh_yangle += 0.02;
+        // i += 1.0;
+        // mesh_scale = _oscillate(i, 1500.0);
+        // let n = 1<<4;
+        // for xi in 0..n {
+        //     for yi in 0..n {
+        //         let projection = project_perspective(&mesh,  mesh_scale, mesh_startx - 50.0/2.0*n as f32 + 50.0*xi as f32, mesh_starty -50.0/2.0*n as f32 + 50.0*yi as f32, -5.0, mesh_xangle, mesh_yangle, mesh_zangle);
+        //         draw_projection_with_mesh(&mut pixels, &projection, &faces, randcolour);
+        //     } 
+        // }
+        // draw_num(&mut pixels, WIDTH*50/100 , HEIGHT*50/100, 10, 5, n * n, BLACK);
 
         // FPS COUNTER
         fps_counter += 1;
@@ -596,25 +693,30 @@ async fn main() {
         //     mesh_scale = oscillate(mesh_scale_i, (WIDTH+HEIGHT) as f32 / 3.0);
         // }
         match [is_key_down(KeyCode::LeftAlt)||is_key_down(KeyCode::RightAlt), is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift), is_key_down(KeyCode::Left), is_key_down(KeyCode::Right), is_key_down(KeyCode::Up), is_key_down(KeyCode::Down)] {
-            _left @ [false, false, true, _, _, _] => { mesh_yangle -= 0.02 },
-            _shift_left @ [false, true, true, _, _, _] => { mesh_startx -= 10.0 },
-            _ctrl_left @ [true, false, true, _, _, _] => { mesh_zangle -= 0.02 },
+            _left @ [false, false, true, false, false, false] => { mesh_yangle -= 0.02 },
+            _shift_left @ [false, true, true, false, false, false] => { mesh_startx -= 10.0 },
+            _ctrl_left @ [true, false, true, false, false, false] => { mesh_zangle -= 0.02 },
 
-            _right @ [false, false, _, true, _, _] => { mesh_yangle += 0.02 },
-            _shift_right @ [false, true, _, true, _, _] => { mesh_startx += 10.0 },
-            _ctrl_right @ [true, false, _, true, _, _] => { mesh_zangle += 0.02 },
+            _right @ [false, false, false, true, false, false] => { mesh_yangle += 0.02 },
+            _shift_right @ [false, true, false, true, false, false] => { mesh_startx += 10.0 },
+            _ctrl_right @ [true, false, false, true, false, false] => { mesh_zangle += 0.02 },
 
-            _up @ [false, false, _, _, true, _] => { mesh_scale *= 1.1 },
-            _shift_up @ [false, true, _, _, true, _] => { mesh_starty -= 10.0 },
-            _ctrl_up @ [true, false, _, _, true, _] => { mesh_xangle += 0.02 },
+            _up @ [false, false, false, false, true, false] => { mesh_scale *= 1.1 },
+            _shift_up @ [false, true, false, false, true, false] => { mesh_starty -= 10.0 },
+            _ctrl_up @ [true, false, false, false, true, false] => { mesh_xangle -= 0.02 },
 
-            _down @ [false, false, _, _, _, true] => { mesh_scale /= 1.1 },
-            _shift_down @ [false, true, _, _, _, true] => { mesh_starty += 10.0 },
-            _ctrl_down @ [true, false, _, _, _, true] => { mesh_xangle -= 0.02 },
+            _down @ [false, false, false, false, false, true] => { mesh_scale /= 1.1 },
+            _shift_down @ [false, true, false, false, false, true] => { mesh_starty += 10.0 },
+            _ctrl_down @ [true, false, false, false, false, true] => { mesh_xangle += 0.02 },
             _ => {}
         }
-        let projection = project_perspective(&mesh,  mesh_scale * 10.0, mesh_startx, mesh_starty + HEIGHT as f32 / 2.0, -5.0, mesh_xangle, mesh_yangle, mesh_zangle);
-        draw_projection_with_mesh(&mut pixels, &projection, &triangles, BLACK);
+        // mesh_yangle += 0.02;
+        // mesh_xangle += 0.02;
+        // mesh_zangle += 0.02;
+        let (projection, faces_culled) = project_perspective_with_culling(&mesh,  mesh_scale * 10.0, mesh_startx, mesh_starty, -5.0, camera, mesh_xangle, mesh_yangle, mesh_zangle, &faces);
+        draw_projection_with_mesh(&mut pixels, &projection, &faces_culled, BLACK);
+        draw_num(&mut pixels, 300, 100, 10, 5, faces.len() as u32, BLACK);
+        draw_num(&mut pixels, 300, 500, 10, 5, faces_culled.len() as u32, BLACK);
 
 
         // GLOBAL FPS LOCK WITH SLEEP -----> DOES NOT WORK OVER WASM!
